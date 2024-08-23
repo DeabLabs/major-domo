@@ -1,4 +1,4 @@
-import type { Client, Events, Message } from "discord.js";
+import { hyperlink, type Client, type Events, type Message } from "discord.js";
 import invariant from "tiny-invariant";
 import { z } from "zod";
 import { ENV } from "../env";
@@ -10,7 +10,9 @@ const websiteUrl = //"https://cannoli.website/canvas/open";
 
 const websitePayloadSchema = z.object({
 	redirect: z.string(),
-	expiration: z.number(),
+	expirationDateMs: z.number(),
+	downloadUrlObsidian: z.string(),
+	downloadUrlRaw: z.string(),
 });
 
 export const messageCreate = async (client: Client, message: Message) => {
@@ -41,12 +43,15 @@ export const messageCreate = async (client: Client, message: Message) => {
 			invariant(response.ok, "Response is not ok");
 			const data = await response.json();
 			const payload = websitePayloadSchema.parse(data);
-			const { redirect, expiration } = payload;
+			const { redirect, expirationDateMs, downloadUrlObsidian } = payload;
+			const filename = message.attachments.first()?.name;
+			invariant(filename, "Filename is undefined");
+			const openInObsidian = `${downloadUrlObsidian}?filename=${encodeURIComponent(`Cannoli Downloads/${filename}`)}`;
 
-			// Reply to the message with the redirect url
-			// using discord's timestamp format to display the expiration time in the user's timezone
+			// Reply to the message with the redirect url and expiration time
 			await message.reply(
-				`Please visit ${redirect} to see your canvas.\nThis link will expire on <t:${Math.floor(expiration)}:f>.`,
+				// `If you would like to preview this cannoli on the web, click the link below:\n\n${hyperlink("Open on Cannoli Website Editor", redirect)}\n\nIf you'd like to download and open this in Obsidian, click the link below:\n\n${hyperlink("Open in Obsidian", openInObsidian)}\n\nThese links will expire on <t:${Math.floor(expirationDateMs / 1000)}:f>.`,
+				`If you'd like to download and open this cannoli in Obsidian, click the link below:\n\n${hyperlink("Open in Obsidian", openInObsidian)}\n\nThese links will expire on <t:${Math.floor(expirationDateMs / 1000)}:f>.`,
 			);
 		} catch (error) {
 			console.error(error);
